@@ -42,7 +42,7 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) types.GenesisState {
 	return GenesisState{
 		Distributions:       keeper.GetDistributions(ctx),
 		DistributionRecords: keeper.GetRecords(ctx),
-		Claims:              keeper.GetClaims(ctx),
+		// Claims:              keeper.GetClaims(ctx),
 	}
 }
 
