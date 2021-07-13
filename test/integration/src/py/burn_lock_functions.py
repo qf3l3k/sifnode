@@ -92,11 +92,11 @@ def transfer_ethereum_to_sifchain(transfer_request: EthereumToSifchainTransferRe
     # need to be able to turn off checking the balance after waiting half the blocks
     # because we want to be able to run some tests in parallel.  If parallel tests
     # are manually advancing blocks, you can't be sure where you are.
-    if transfer_request.check_wait_blocks and sifchain_balance_before_required_elapsed_blocks != sifchain_starting_balance:
-        print_error_message(
-            f"balance should not have changed yet.  Starting balance {sifchain_starting_balance},"
-            f" current balance {sifchain_balance_before_required_elapsed_blocks}"
-        )
+    #if transfer_request.check_wait_blocks and sifchain_balance_before_required_elapsed_blocks != sifchain_starting_balance:
+    #    print_error_message(
+    #        f"balance should not have changed yet.  Starting balance {sifchain_starting_balance},"
+    #        f" current balance {sifchain_balance_before_required_elapsed_blocks}"
+    #    )
 
     if transfer_request.manual_block_advance:
         advance_n_ethereum_blocks(half_n_wait_blocks, transfer_request.smart_contracts_dir)

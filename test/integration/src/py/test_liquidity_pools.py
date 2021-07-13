@@ -380,6 +380,8 @@ def test_pools(
     request.ethereum_symbol = new_currency["newtoken_address"]
     request.sifchain_symbol = sifchain_symbol
     request.amount = target_new_currency_balance
+    request.ethereum_address = operator_address
+    request.ethereum_private_key_env_var = "OPERATOR_PRIVATE_KEY"
     burn_lock_functions.transfer_ethereum_to_sifchain(request)
 
     sifaddress = request.sifchain_address
@@ -399,6 +401,8 @@ def test_pools(
     request2.ethereum_symbol = new_currency["newtoken_address"]
     request2.sifchain_symbol = sifchain_symbol
     request2.amount = target_new_currency_balance
+    request2.ethereum_address = operator_address
+    request2.ethereum_private_key_env_var = "OPERATOR_PRIVATE_KEY"
     burn_lock_functions.transfer_ethereum_to_sifchain(request2)
 
     sifaddress2 = request2.sifchain_address
