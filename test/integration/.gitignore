@@ -3,3 +3,13 @@ vagrantenv.sh
 /watcher_pids.txt
 sandpit.log
 ../../smart-contracts/combined.log
+/gobin
+/gocache
+/configs
+/logs
+/docker-compose.yml
+
+# virtualenv files
+/lib
+/bin
+/share

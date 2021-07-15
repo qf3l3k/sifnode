@@ -69,7 +69,6 @@ def test_transfer_eth_to_ceth_over_limit(
     basic_transfer_request.ethereum_address = source_ethereum_address
     basic_transfer_request.amount = 35 * 10 ** 18
     with pytest.raises(Exception):
-        basic_transfer_request.ethereum_address = source_ethereum_address
         generate_test_account(
             basic_transfer_request,
             rowan_source_integrationtest_env_transfer_request,

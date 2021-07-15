@@ -62,7 +62,7 @@ def test_bulk_transfers(
             f"--transactions \'{json_requests}\'",
             f"--ethereum_address {source_ethereum_address}",
             f"--bridgebank_address {bridgebank_address}",
-            f"--ethereum_network {ethereum_network}",
+            f"--network {ethereum_network}",
         ])
     )
     requests = list(map(lambda addr: {
@@ -83,7 +83,7 @@ def test_bulk_transfers(
             f"--transactions \'{json_requests}\'",
             f"--ethereum_address {source_ethereum_address}",
             f"--bridgebank_address {bridgebank_address}",
-            f"--ethereum_network {ethereum_network}",
+            f"--network {ethereum_network}",
         ])
     )
     logging.info(f"bulk result: {yarn_result}")
