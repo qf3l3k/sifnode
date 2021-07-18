@@ -5,6 +5,7 @@ package relayer
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ctypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sethvargo/go-password/password"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tendermint/go-amino"
@@ -136,6 +138,103 @@ func LoadTendermintCLIContext(appCodec *amino.Codec, validatorAddress sdk.ValAdd
 		return sdkContext.CLIContext{}, err
 	}
 	return cliCtx, nil
+}
+
+/**
+ * findHeightFromLog takes a slice of Logs returned from FilterQuery and searches for LogNewOracleClaims
+ * when it finds the claims it returns the height of the log entry or returns an error if none are found.
+ * Should only be called by determineEtherumHeight method
+ */
+func (sub EthereumSub) findHeightFromLog(log *[]ctypes.Log, clientChainID *big.Int, contractAddress common.Address, oracleABI abi.ABI) (*big.Int, error) {
+	for _, raw_event := range *log {
+		_, _, err := sub.logToEvent(clientChainID, contractAddress, oracleABI, raw_event)
+		if err != nil {
+			sub.SugaredLogger.Error("Failed to transform from log to event, returning default height")
+			continue
+		}
+		// TO DO parse event and check validator address matches this relayers address
+		// if matches return the height of the block + 1
+	}
+	return big.NewInt(0), errors.New("height not found")
+}
+
+/**
+ * determineEthereumHeight is a method which takes a stop signal if the function should end early, a
+ * chainId to identify which chain to search, and a ethereum websocket client. It then performs a
+ * FilterQuery on the chain looking for past oracle logs by this relayer and sets the block height
+ * to the last oracle signed by this relayer. This function is called by the Start method.
+ *
+ */
+func (sub EthereumSub) determineEthereumHeight(quit <-chan os.Signal, clientChainID *big.Int, client *ethclient.Client) *big.Int {
+	sugar := sub.SugaredLogger
+	oracleAddress, err := txs.GetAddressFromBridgeRegistry(client, sub.RegistryContractAddress, txs.CosmosBridge, sugar)
+	if err != nil {
+		log.Fatal("Error getting bridgebank address: ", err.Error())
+	}
+	oracleContractABI := contract.LoadABI(txs.Oracle)
+
+	newPhrophecyClaim := oracleContractABI.Events[types.LogNewProphecyClaim.String()].ID()
+	sugar.Info("Searching for Phrophecy Claims with address: ", newPhrophecyClaim.Hex())
+	query := ethereum.FilterQuery{
+		FromBlock: nil,
+		ToBlock:   nil,
+		Addresses: []common.Address{oracleAddress},
+		Topics:    [][]common.Hash{{newPhrophecyClaim}},
+	}
+	query_result, err := client.FilterLogs(context.Background(), query)
+	if err == nil {
+		// We where able to query all oracle events in one go, thats some time saved!
+		height, err := sub.findHeightFromLog(&query_result, clientChainID, oracleAddress, oracleContractABI)
+		if err != nil {
+			sugar.Info("Was unable to find a previous height for this relayer, starting at default")
+			return big.NewInt(0)
+		}
+		sugar.Info("Determined the last ran height was: ", height)
+		return height
+	}
+
+	sugar.Info("Query has failed!, This typically means that more then 1,000 claims exist. Going to search day by day", query, err.Error())
+	// Going to roughly search past 6 months assuming an average of 6,400 blocks per day. If it fails we return blockheight of 0
+	// Getting current block height
+	currentBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		sugar.Error("Could not determine current block height, going to default", err)
+		return big.NewInt(0)
+	}
+	const blockAverage = 6400 // Assumed Average Blocks Per Day
+	const searchTime = 180    // ~6 months
+	currentHeight := currentBlockHeader.Number
+	subtractedHeight := big.NewInt(blockAverage * searchTime) // Height we subtract from currentHeight to get stop height
+	stopHeight := big.NewInt(0)                               // Height we stop searching and default at
+	decrementHeight := big.NewInt(blockAverage)               // How much we subtract between each iteration (roughly one day)
+	stopHeight = stopHeight.Sub(currentHeight, subtractedHeight)
+	fromHeight := big.NewInt(0)
+	fromHeight = fromHeight.Set(currentHeight)
+	fromHeight = fromHeight.Sub(fromHeight, decrementHeight) // Sets the starting from/to range
+	for currentHeight.Cmp(stopHeight) > 0 {
+		select {
+		case <-quit:
+			sugar.Warn("Received quit signal, I am returning default height to return immediatly.")
+			return big.NewInt(0)
+		default:
+			query.FromBlock = fromHeight
+			query.ToBlock = currentHeight
+			fromHeight = fromHeight.Sub(fromHeight, decrementHeight)
+			currentHeight = currentHeight.Sub(currentHeight, decrementHeight)
+			query_result, err := client.FilterLogs(context.Background(), query)
+			if err != nil {
+				sugar.Error("Received an error attempting to search logs day by day, returning default")
+				return big.NewInt(0)
+			}
+			height, err := sub.findHeightFromLog(&query_result, clientChainID, oracleAddress, oracleContractABI)
+			if err == nil {
+				sugar.Info("Determined the last ran height was: ", height)
+				return height
+			}
+		}
+	}
+	sugar.Info("Was unable to find past height logs, running as default")
+	return big.NewInt(0)
 }
 
 // Start an Ethereum chain subscription

@@ -20,6 +20,7 @@ import (
 const (
 	BridgeBankABI   = "/generated/abi/BridgeBank/BridgeBank.abi"
 	CosmosBridgeABI = "/generated/abi/CosmosBridge/CosmosBridge.abi"
+	OracleABI       = "/generated/abi/CosmosBridge/Oracle.abi"
 )
 
 // LoadABI loads a smart contract as an abi.ABI
@@ -35,6 +36,8 @@ func LoadABI(contractType txs.ContractRegistry) abi.ABI {
 		filePath = CosmosBridgeABI
 	case txs.BridgeBank:
 		filePath = BridgeBankABI
+	case txs.Oracle:
+		filePath = OracleABI
 	}
 
 	// Read the file containing the contract's ABI

@@ -31,11 +31,13 @@ const (
 	NewProphecyClaim
 	// CreateEthBridgeClaim is a Cosmos msg of type MsgCreateEthBridgeClaim
 	CreateEthBridgeClaim
+	// New Oracle Claim is Logged
+	LogNewOracleClaim
 )
 
 // String returns the event type as a string
 func (d Event) String() string {
-	return [...]string{"unsupported", "burn", "lock", "LogLock", "LogBurn", "LogNewProphecyClaim", "newProphecyClaim", "create_claim"}[d]
+	return [...]string{"unsupported", "burn", "lock", "LogLock", "LogBurn", "LogNewProphecyClaim", "newProphecyClaim", "create_claim", "LogNewOracleClaim"}[d]
 }
 
 // EthereumEvent struct is used by LogLock and LogBurn
