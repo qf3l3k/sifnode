@@ -68,7 +68,7 @@ def build_chain(args: SifnodedRunner):
         v["sifnodedpath"] = sifnodedpath
         m = v["moniker"]
         o = subprocess.run(
-            f"yes {p} | {args.bin_prefix}/sifnodecli keys show -a --bech val {m} --home {sifnodeclipath}",
+            f"yes {p} | {args.bin_prefix}/sifnoded keys show -a --bech val {m} --home {sifnodeclipath}",
             shell=True,
             text=True,
             capture_output=True
@@ -83,7 +83,7 @@ def build_chain(args: SifnodedRunner):
     print(f"validators: \n{json.dumps(validators)}")
 
     # need a new account to be the administrator
-    adminusercmd = f"yes | {args.bin_prefix}/sifnodecli keys add sifnodeadmin --keyring-backend test -o json"
+    adminusercmd = f"yes | {args.bin_prefix}/sifnoded keys add sifnodeadmin --keyring-backend test -o json"
     adminuseroutput = subprocess.run(
         adminusercmd,
         capture_output=True,
@@ -156,7 +156,7 @@ def export_key(
         backend: str,
         password: str
 ):
-    cmd = f'yes {password} | sifnodecli keys export --keyring-backend {backend} {key_name}'
+    cmd = f'yes {password} | sifnoded keys export --keyring-backend {backend} {key_name}'
     output = subprocess.run(
         cmd,
         shell=True,
@@ -176,11 +176,11 @@ def import_key(
         key_contents: str
 ):
     # note that you can also get keys with
-    # sifnodecli keys add --keyring-backend test --recover fnord
+    # sifnoded keys add --keyring-backend test --recover fnord
     # using a mnemonic
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as keyfile:
         keyfile.write(key_contents)
-        cmd = f'yes {password} | sifnodecli keys import {key_name} --keyring-backend {backend} {keyfile.name}'
+        cmd = f'yes {password} | sifnoded keys import {key_name} --keyring-backend {backend} {keyfile.name}'
         output = subprocess.run(
             cmd,
             shell=True,
@@ -196,7 +196,7 @@ def recover_key(
         backend: str,
         mnemonic: str,
 ):
-    cmd = f'echo "{mnemonic}" | sifnodecli keys add --keyring-backend {backend} {key_name} --recover'
+    cmd = f'echo "{mnemonic}" | sifnoded keys add --keyring-backend {backend} {key_name} --recover'
     subprocess.run(
         cmd,
         shell=True,

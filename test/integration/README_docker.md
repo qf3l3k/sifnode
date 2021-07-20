@@ -9,7 +9,7 @@ cd test/integration/vagrant && make sifdocker
 Set up the python environment (requires python 3.8+):
 
 ```
-cd test/integration && virtualenv python3.8 .
+cd test/integration && virtualenv -p python3.8 .
 source bin/activate
 pip install -r src/py/requirements.txt
 ```

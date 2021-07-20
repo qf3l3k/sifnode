@@ -13,3 +13,4 @@ sandpit.log
 /lib
 /bin
 /share
+/pyvenv.cfg

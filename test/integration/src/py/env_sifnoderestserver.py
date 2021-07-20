@@ -44,7 +44,7 @@ def start_sifnoderestserver(conf: SifnodeRestServer):
     )
 
 def sifnoderestserver_cmd(conf: SifnodeRestServer):
-    return f"sifnodecli rest-server --laddr tcp://0.0.0.0:{conf.port}"
+    return f"sifnoded rest-server --laddr tcp://0.0.0.0:{conf.port}"
 
 
 def deploy_contracts_cmd(args: SmartContractDeployInput):
