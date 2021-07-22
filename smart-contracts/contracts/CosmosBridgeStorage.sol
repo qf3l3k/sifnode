@@ -28,10 +28,11 @@ contract CosmosBridgeStorage {
     */
     address payable public bridgeBank;
     
-    /**
-    * @notice gap of storage for future upgrades
+    /*
+    * @notice [DEPRECATED] now, CosmosBridge is BridgeBank
     */
-    bool public hasBridgeBank;
+    bool private hasBridgeBank;
+
     /**
     * @notice gap of storage for future upgrades
     */

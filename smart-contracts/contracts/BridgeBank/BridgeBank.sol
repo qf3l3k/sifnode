@@ -5,7 +5,6 @@ import "./CosmosBank.sol";
 import "./EthereumWhitelist.sol";
 import "./CosmosWhiteList.sol";
 import "../Oracle.sol";
-import "../CosmosBridge.sol";
 import "./BankStorage.sol";
 import "./Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -34,7 +33,6 @@ contract BridgeBank is BankStorage,
      * @dev: Initializer
      */
     function initialize(
-        address _cosmosBridgeAddress,
         address _owner,
         address _pauser
     ) public {
@@ -43,7 +41,6 @@ contract BridgeBank is BankStorage,
         CosmosWhiteList._cosmosWhitelistInitialize();
         Pausable._pausableInitialize(_pauser);
 
-        cosmosBridge = _cosmosBridgeAddress;
         owner = _owner;
         _initialized = true;
         contractName[address(0)] = "Ethereum";
@@ -55,17 +52,6 @@ contract BridgeBank is BankStorage,
      */
     modifier onlyOwner {
         require(msg.sender == owner, "!owner");
-        _;
-    }
-
-    /*
-     * @dev: Modifier to restrict access to the cosmos bridge
-     */
-    modifier onlyCosmosBridge {
-        require(
-            msg.sender == cosmosBridge,
-            "!cosmosbridge"
-        );
         _;
     }
 
@@ -84,7 +70,7 @@ contract BridgeBank is BankStorage,
      * @param inList: set the token in list or not
      * @return: new value of if token in whitelist
      */
-    function setTokenInCosmosWhiteList(address token, bool inList)
+    function _setTokenInCosmosWhiteList(address token, bool inList)
         internal returns (bool)
     {
         _cosmosTokenWhiteList[token] = inList;
@@ -130,17 +116,17 @@ contract BridgeBank is BankStorage,
      * @param _symbol: The new BridgeToken's symbol
      * @return: The new BridgeToken contract's address
      */
-    function createNewBridgeToken(
+    function _createNewBridgeToken(
         string calldata name,
         string calldata symbol,
         uint8 decimals
-    ) external onlyCosmosBridge returns (address) {
+    ) internal returns (address) {
         address newTokenAddress = deployNewBridgeToken(
             name,
             symbol,
             decimals
         );
-        setTokenInCosmosWhiteList(newTokenAddress, true);
+        _setTokenInCosmosWhiteList(newTokenAddress, true);
 
         return newTokenAddress;
     }
@@ -153,14 +139,14 @@ contract BridgeBank is BankStorage,
     function addExistingBridgeToken(
         address contractAddress    
     ) external onlyOwner returns (bool) {
-        return setTokenInCosmosWhiteList(contractAddress, true);
+        return _setTokenInCosmosWhiteList(contractAddress, true);
     }
 
-    function handleUnpeg(
+    function _handleUnpeg(
         address payable ethereumReceiver,
         address tokenAddress,
         uint256 amount
-    ) external onlyCosmosBridge whenNotPaused {
+    ) internal whenNotPaused {
         // if this is a bridge controlled token, then we need to mint
         if (getCosmosTokenInWhiteList(tokenAddress)) {
             mintNewBridgeTokens(

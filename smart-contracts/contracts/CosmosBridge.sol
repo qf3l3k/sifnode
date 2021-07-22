@@ -6,15 +6,13 @@ import "./BridgeBank/BridgeBank.sol";
 import "./CosmosBridgeStorage.sol";
 import "../node_modules/hardhat/console.sol";
 
-contract CosmosBridge is CosmosBridgeStorage, Oracle {
+contract CosmosBridge is BridgeBank, CosmosBridgeStorage, Oracle {
     bool private _initialized;
     uint256[100] private ___gap;
 
     /*
      * @dev: Event declarations
      */
-    event LogBridgeBankSet(address bridgeBank);
-
     event LogNewProphecyClaim(
         uint256 indexed prophecyID,
         address indexed ethereumReceiver,
@@ -68,21 +66,6 @@ contract CosmosBridge is CosmosBridgeStorage, Oracle {
     function changeOperator(address _newOperator) external onlyOperator {
         require(_newOperator != address(0), "invalid address");
         operator = _newOperator;
-    }
-
-    /*
-     * @dev: setBridgeBank
-     */
-    function setBridgeBank(address payable _bridgeBank) external onlyOperator {
-        require(
-            !hasBridgeBank,
-            "The Bridge Bank cannot be updated once it has been set"
-        );
-
-        hasBridgeBank = true;
-        bridgeBank = _bridgeBank;
-
-        emit LogBridgeBankSet(bridgeBank);
     }
 
     function getProphecyID(
@@ -280,12 +263,7 @@ contract CosmosBridge is CosmosBridgeStorage, Oracle {
         );
         // need to make a business decision on what this symbol should be
         // First lock of this asset, deploy new contract and get new symbol/token address
-        address tokenAddress = BridgeBank(bridgeBank)
-            .createNewBridgeToken(
-                name,
-                symbol,
-                decimals
-            );
+        address tokenAddress = _createNewBridgeToken(name, symbol, decimals);
 
         sourceAddressToDestinationAddress[sourceChainTokenAddress] = tokenAddress;
 
@@ -311,15 +289,8 @@ contract CosmosBridge is CosmosBridgeStorage, Oracle {
         address tokenAddress,
         uint256 amount
     ) internal {
-        (bool success, ) = bridgeBank.call{gas: 120000}(
-            abi.encodeWithSignature(
-                "handleUnpeg(address,address,uint256)",
-                ethereumReceiver,
-                tokenAddress,
-                amount
-            )
-        );
-
+        _handleUnpeg(ethereumReceiver, tokenAddress, amount);
+        
         // prophecy completed and whether or not the call to bridgebank was successful
         emit LogProphecyCompleted(prophecyID, success);
     }

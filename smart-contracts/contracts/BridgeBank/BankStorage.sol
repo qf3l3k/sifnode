@@ -20,10 +20,10 @@ contract BankStorage is
     */
     address private oracle;
 
-    /**
-    * @notice address of the Cosmos Bridge smart contract
+    /*
+    * @notice [DEPRECATED] address of the Cosmos Bridge smart contract
     */
-    address public cosmosBridge;
+    address private cosmosBridge;
 
     /**
     * @notice owner address that can use the admin API
