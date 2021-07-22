@@ -4,7 +4,7 @@ pragma solidity 0.8.0;
 import "./Oracle.sol";
 import "./BridgeBank/BridgeBank.sol";
 import "./CosmosBridgeStorage.sol";
-import "hardhat/console.sol";
+import "../node_modules/hardhat/console.sol";
 
 contract CosmosBridge is CosmosBridgeStorage, Oracle {
     bool private _initialized;
