@@ -2,15 +2,12 @@ package keeper_test
 
 import (
 	"bytes"
+	"fmt"
+	"regexp"
 	"strconv"
 	"testing"
 
-	clp "github.com/Sifchain/sifnode/x/clp"
-	k "github.com/Sifchain/sifnode/x/clp/keeper"
-	"github.com/Sifchain/sifnode/x/clp/test"
-	"github.com/Sifchain/sifnode/x/clp/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func NewSigner(signer string) sdk.AccAddress {
@@ -38,66 +35,121 @@ func NewSigner(signer string) sdk.AccAddress {
 	return res
 }
 
+var (
+	reDnm *regexp.Regexp
+)
+
+func NewCoin(denom string, amount sdk.Int) sdk.Coin {
+	coin := sdk.Coin{
+		Denom:  denom,
+		Amount: amount,
+	}
+
+	// if err := coin.Validate(); err != nil {
+	// 	panic(err)
+	// }
+
+	return coin
+}
+
+func Validate(coin sdk.Coin) error {
+	if err := ValidateDenom(coin.Denom); err != nil {
+		return err
+	}
+
+	if coin.Amount.IsNegative() {
+		return fmt.Errorf("negative coin amount: %v", coin.Amount)
+	}
+
+	return nil
+}
+
+func ValidateDenom(denom string) error {
+	reDnmString := `[a-zA-Z][a-zA-Z0-9/]{2,127}`
+	reDnm = regexp.MustCompile(fmt.Sprintf(`^%s$`, reDnmString))
+
+	if !reDnm.MatchString(denom) {
+		return fmt.Errorf("invalid denom: %s", denom)
+	}
+	return nil
+}
+
 func TestKeeper_CreatePoolAndProvideLiquidity(t *testing.T) {
-	app, ctx := test.CreateTestApp(false)
-	keeper := app.ClpKeeper
-	handler := clp.NewHandler(keeper)
-	signer := test.GenerateAddress("")
+
+	// e := ValidateDenom("1inch")
+	// fmt.Println("_____")
+	// fmt.Println(e)
 	initialBalance := sdk.NewUintFromString("700000000000000000000")
-	nativeAmount := sdk.NewUintFromString("2000000000000000000")
-	externalAmount := sdk.NewUintFromString("5000000000000000000")
-	asset := types.NewAsset("dai") // cusdt, cusdc, c1inch - ok; usdt, usdc, 1inch - error, TODO: investigate, might be a critical issue
-	externalCoin := sdk.NewCoin(asset.Symbol, sdk.Int(initialBalance))
-	nativeCoin := sdk.NewCoin(types.NativeSymbol, sdk.Int(initialBalance))
-	err := app.BankKeeper.AddCoins(ctx, signer, sdk.Coins{externalCoin, nativeCoin})
-	assert.NoError(t, err)
 
-	ok := keeper.HasBalance(ctx, signer, externalCoin)
-	assert.True(t, ok, "")
+	c := NewCoin("1inch", sdk.Int(initialBalance))
+	fmt.Println("_____")
+	fmt.Println(c)
+	ts := Validate(c)
+	fmt.Println("_____")
+	fmt.Println(ts)
 
-	ok = keeper.HasBalance(ctx, signer, nativeCoin)
-	assert.True(t, ok, "")
+	//app, ctx := test.CreateTestApp(false)
+	//keeper := app.ClpKeeper
+	//handler := clp.NewHandler(keeper)
+	//signer := test.GenerateAddress("")
+	//nativeAmount := sdk.NewUintFromString("2000000000000000000")
+	//externalAmount := sdk.NewUintFromString("5000000000000000000")
+	// asset := types.NewAsset("1inch") // cusdt, cusdc, c1inch - ok; usdt, usdc, 1inch - error, TODO: investigate, might be a critical issue
+	// externalCoin := sdk.NewCoin(asset.Symbol, sdk.Int(initialBalance))
+	// nativeCoin := sdk.NewCoin(types.NativeSymbol, sdk.Int(initialBalance))
+	// fmt.Println("_____")
+	// fmt.Println(externalCoin.String())
+	// fmt.Println("_____")
+	// fmt.Println(nativeCoin.String())
+	// err := app.BankKeeper.AddCoins(ctx, signer, sdk.Coins{externalCoin, nativeCoin})
+	// assert.NoError(t, err)
 
-	msg := types.NewMsgCreatePool(signer, asset, nativeAmount, externalAmount)
-	assert.NoError(t, err)
+	// ok := keeper.HasBalance(ctx, signer, externalCoin)
+	// assert.True(t, ok, "")
 
-	_, err = handler(ctx, &msg)
-	assert.NoError(t, err)
+	// ok = keeper.HasBalance(ctx, signer, nativeCoin)
+	// assert.True(t, ok, "")
 
-	nativeBalance := msg.NativeAssetAmount
-	externalBalance := msg.ExternalAssetAmount
-	assert.Equal(t, "2000000000000000000", nativeBalance.String())
-	assert.Equal(t, "5000000000000000000", externalBalance.String())
+	// msg := types.NewMsgCreatePool(signer, asset, nativeAmount, externalAmount)
+	// assert.NoError(t, err)
 
-	poolUnits, lpunits, err := k.CalculatePoolUnits(msg.ExternalAsset.Symbol, sdk.ZeroUint(),
-		sdk.ZeroUint(), sdk.ZeroUint(), nativeBalance, externalBalance)
-	assert.NoError(t, err)
-	assert.Equal(t, "2000000000000000000", lpunits.String())
-	assert.Equal(t, "2000000000000000000", poolUnits.String())
+	// _, err = handler(ctx, &msg)
+	// assert.NoError(t, err)
 
-	pool, err := keeper.CreatePool(ctx, poolUnits, &msg)
-	assert.NoError(t, err)
-	assert.Equal(t, externalCoin.Denom, pool.ExternalAsset.Symbol)
-	assert.Equal(t, "2000000000000000000", pool.PoolUnits.String())
-	assert.Equal(t, "2000000000000000000", pool.NativeAssetBalance.String())
-	assert.Equal(t, "5000000000000000000", pool.ExternalAssetBalance.String())
+	// nativeBalance := msg.NativeAssetAmount
+	// externalBalance := msg.ExternalAssetAmount
+	// assert.Equal(t, "2000000000000000000", nativeBalance.String())
+	// assert.Equal(t, "5000000000000000000", externalBalance.String())
 
-	addr, err := sdk.AccAddressFromBech32(msg.Signer)
-	assert.NoError(t, err)
+	// poolUnits, lpunits, err := k.CalculatePoolUnits(msg.ExternalAsset.Symbol, sdk.ZeroUint(),
+	// 	sdk.ZeroUint(), sdk.ZeroUint(), nativeBalance, externalBalance)
+	// assert.NoError(t, err)
+	// assert.Equal(t, "2000000000000000000", lpunits.String())
+	// assert.Equal(t, "2000000000000000000", poolUnits.String())
 
-	lp := keeper.CreateLiquidityProvider(ctx, msg.ExternalAsset, lpunits, signer)
-	assert.Equal(t, addr.String(), lp.LiquidityProviderAddress)
-	assert.Equal(t, lpunits, lp.LiquidityProviderUnits)
+	// pool, err := keeper.CreatePool(ctx, poolUnits, &msg)
+	// assert.NoError(t, err)
+	// assert.Equal(t, externalCoin.Denom, pool.ExternalAsset.Symbol)
+	// assert.Equal(t, "2000000000000000000", pool.PoolUnits.String())
+	// assert.Equal(t, "2000000000000000000", pool.NativeAssetBalance.String())
+	// assert.Equal(t, "5000000000000000000", pool.ExternalAssetBalance.String())
 
-	msgAddLiquidity := types.NewMsgAddLiquidity(signer, asset, nativeAmount, externalAmount)
-	assert.NoError(t, err)
+	// addr, err := sdk.AccAddressFromBech32(msg.Signer)
+	// assert.NoError(t, err)
 
-	_, err = handler(ctx, &msgAddLiquidity)
-	assert.NoError(t, err)
+	// lp := keeper.CreateLiquidityProvider(ctx, msg.ExternalAsset, lpunits, signer)
+	// assert.Equal(t, addr.String(), lp.LiquidityProviderAddress)
+	// assert.Equal(t, lpunits, lp.LiquidityProviderUnits)
 
-	lp2, err := keeper.AddLiquidity(ctx, &msgAddLiquidity, *pool, externalAmount, lpunits)
-	assert.NoError(t, err)
-	assert.Equal(t, "6000000000000000000", lp2.LiquidityProviderUnits.String())
-	assert.Equal(t, "2000000000000000000", pool.NativeAssetBalance.String())
-	assert.Equal(t, "5000000000000000000", pool.ExternalAssetBalance.String())
+	// msgAddLiquidity := types.NewMsgAddLiquidity(signer, asset, nativeAmount, externalAmount)
+	// assert.NoError(t, err)
+
+	// _, err = handler(ctx, &msgAddLiquidity)
+	// assert.NoError(t, err)
+
+	// lp2, err := keeper.AddLiquidity(ctx, &msgAddLiquidity, *pool, externalAmount, lpunits)
+	// assert.NoError(t, err)
+	// assert.Equal(t, "6000000000000000000", lp2.LiquidityProviderUnits.String())
+	// assert.Equal(t, "2000000000000000000", pool.NativeAssetBalance.String())
+	// assert.Equal(t, "5000000000000000000", pool.ExternalAssetBalance.String())
 }
