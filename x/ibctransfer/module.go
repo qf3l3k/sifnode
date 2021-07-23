@@ -1,4 +1,4 @@
-package ibc_sifchain
+package ibctransfer
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ var (
 )
 
 // AppModuleBasic defines the basic application module.
-type AppModuleBasic struct{
+type AppModuleBasic struct {
 	cosmosAppModule transfer.AppModule
 }
 
@@ -125,10 +125,10 @@ func (am AppModule) OnTimeoutPacket(ctx sdk.Context, packet types.Packet) (*sdk.
 
 func NewAppModule(keeper sdktransferkeeper.Keeper, cdc codec.BinaryMarshaler) AppModule {
 	return AppModule{
-		AppModuleBasic:  AppModuleBasic{
+		AppModuleBasic: AppModuleBasic{
 			cosmosAppModule: transfer.NewAppModule(keeper),
 		},
-		cdc:             cdc,
+		cdc: cdc,
 	}
 }
 
