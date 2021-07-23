@@ -1,8 +1,7 @@
 package app
 
 import (
-	"github.com/Sifchain/sifnode/x/ibc_sifchain"
-	//"github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer"
+	whitelistkeeper "github.com/Sifchain/sifnode/x/whitelist/keeper"
 	"io"
 	"math/big"
 	"net/http"
@@ -47,6 +46,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer"
 	ibctransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/keeper"
 	ibctransfertypes "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/types"
 	ibc "github.com/cosmos/cosmos-sdk/x/ibc/core"
@@ -92,7 +92,6 @@ import (
 	oraclekeeper "github.com/Sifchain/sifnode/x/oracle/keeper"
 	oracletypes "github.com/Sifchain/sifnode/x/oracle/types"
 	"github.com/Sifchain/sifnode/x/whitelist"
-	whitelistkeeper "github.com/Sifchain/sifnode/x/whitelist/keeper"
 	whitelisttypes "github.com/Sifchain/sifnode/x/whitelist/types"
 )
 
@@ -116,7 +115,7 @@ var (
 		slashing.AppModuleBasic{},
 		evidence.AppModuleBasic{},
 		ibc.AppModuleBasic{},
-		ibc_sifchain.CosmosAppModuleBasic{},
+		transfer.AppModuleBasic{},
 
 		clp.AppModuleBasic{},
 		oracle.AppModuleBasic{},
@@ -275,14 +274,14 @@ func NewSifApp(
 	app.SlashingKeeper = slashingkeeper.NewKeeper(
 		appCodec, keys[slashingtypes.StoreKey], &stakingKeeper, app.GetSubspace(slashingtypes.ModuleName),
 	)
-
+	app.WhitelistKeeper = whitelistkeeper.NewKeeper(appCodec, keys[whitelisttypes.StoreKey])
 	// register the staking hooks
 	// NOTE: stakingKeeper above is passed by reference, so that it will contain these hooks
 	app.StakingKeeper = *stakingKeeper.SetHooks(
 		stakingtypes.NewMultiStakingHooks(app.DistrKeeper.Hooks(), app.SlashingKeeper.Hooks()),
 	)
 
-	app.ClpKeeper = clpkeeper.NewKeeper(appCodec, keys[clptypes.StoreKey], app.BankKeeper, app.AccountKeeper, app.GetSubspace(clptypes.ModuleName))
+	app.ClpKeeper = clpkeeper.NewKeeper(appCodec, keys[clptypes.StoreKey], app.BankKeeper, app.AccountKeeper, app.WhitelistKeeper, app.GetSubspace(clptypes.ModuleName))
 
 	app.OracleKeeper = oraclekeeper.NewKeeper(
 		appCodec,
@@ -306,8 +305,6 @@ func NewSifApp(
 		app.AccountKeeper,
 		app.GetSubspace(disptypes.ModuleName),
 	)
-
-	app.WhitelistKeeper = whitelistkeeper.NewKeeper(appCodec, keys[whitelisttypes.StoreKey])
 
 	// This map defines heights to skip for updates
 	// The mapping represents height to bool. if the value is true for a height that height
@@ -343,8 +340,7 @@ func NewSifApp(
 		app.IBCKeeper.ChannelKeeper, &app.IBCKeeper.PortKeeper,
 		app.AccountKeeper, app.BankKeeper, scopedTransferKeeper,
 	)
-	transferModule := ibc_sifchain.NewAppModule(app.TransferKeeper, appCodec, app.WhitelistKeeper)
-	//transferModule := transfer.NewAppModule(app.TransferKeeper)
+	transferModule := transfer.NewAppModule(app.TransferKeeper)
 
 	// NOTE: the IBC mock keeper and application module is used only for testing core IBC. Do
 	// note replicate if you do not need to test core IBC or light clients.
@@ -382,7 +378,7 @@ func NewSifApp(
 		evidence.NewAppModule(app.EvidenceKeeper),
 		ibc.NewAppModule(app.IBCKeeper),
 		transferModule,
-		clp.NewAppModule(app.ClpKeeper, app.BankKeeper, app.WhitelistKeeper),
+		clp.NewAppModule(app.ClpKeeper, app.BankKeeper),
 		oracle.NewAppModule(app.OracleKeeper),
 		ethbridge.NewAppModule(app.OracleKeeper, app.BankKeeper, app.AccountKeeper, app.EthbridgeKeeper, &appCodec),
 		dispensation.NewAppModule(app.DispensationKeeper, app.BankKeeper, app.AccountKeeper),
