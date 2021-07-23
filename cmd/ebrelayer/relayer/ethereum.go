@@ -16,23 +16,25 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/tx"
 
+	"github.com/Sifchain/sifnode/cmd/ebrelayer/contract"
+	bridgebank "github.com/Sifchain/sifnode/cmd/ebrelayer/contract/generated/bindings/bridgebank"
+	"github.com/Sifchain/sifnode/cmd/ebrelayer/txs"
+	"github.com/Sifchain/sifnode/cmd/ebrelayer/types"
+	ethbridge "github.com/Sifchain/sifnode/x/ethbridge/types"
+	oracletypes "github.com/Sifchain/sifnode/x/oracle/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ctypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/syndtr/goleveldb/leveldb"
 	tmclient "github.com/tendermint/tendermint/rpc/client/http"
 	"go.uber.org/zap"
-
-	"github.com/Sifchain/sifnode/cmd/ebrelayer/contract"
-	"github.com/Sifchain/sifnode/cmd/ebrelayer/txs"
-	"github.com/Sifchain/sifnode/cmd/ebrelayer/types"
-	ethbridge "github.com/Sifchain/sifnode/x/ethbridge/types"
-	oracletypes "github.com/Sifchain/sifnode/x/oracle/types"
 )
 
 const (
@@ -89,6 +91,65 @@ func NewEthereumSub(
 		SugaredLogger:           sugaredLogger,
 	}
 }
+
+// Query the BridgeBank smart contract and return the current LockUnlockNonce Value
+// Requires already connected ethclient. Can return invalid Nonce without error if node is out
+// of sync with the blockchain
+func (sub EthereumSub) LockUnlockNonce(ethClient *ethclient.Client) (*big.Int, error) {
+	// get the bridgebank address from the registry contract
+	sugar := sub.SugaredLogger
+	bridgeBankAddress, err := txs.GetAddressFromBridgeRegistry(ethClient, sub.RegistryContractAddress, txs.BridgeBank, sub.SugaredLogger)
+	if err != nil {
+		sugar.Error("Error getting bridgebank address: ", err.Error())
+		return nil, err
+	}
+	bridgeBank, err := bridgebank.NewBridgeBank(bridgeBankAddress, ethClient)
+	if err != nil {
+		sugar.Error("Error getting bridgebank contract: ", err.Error())
+		return nil, err
+	}
+	callOpts := bind.CallOpts{
+		Pending: false, // Should this be true? Should the relayer on wake up be aware of a pending change?
+		Context: context.Background(),
+	}
+	nonce, err := bridgeBank.LockBurnNonce(&callOpts)
+	if err != nil {
+		sugar.Error("Error getting bridgebank LockBurnNonce: ", err.Error())
+		return nil, err
+	}
+	return nonce, nil
+}
+
+// LastNonceSubmitted should be available to through the abigen code but its not there, is the generation out
+// of date?
+
+// // Query the BridgeBank smart contract and return the current LastNonceSubmitted Value
+// // Requires already connected ethclient. Can return invalid Nonce without error if node is out
+// // of sync with the blockchain
+// func (sub EthereumSub) LastNonceSubmitted(ethClient *ethclient.Client) (*big.Int, error) {
+// 	// get the bridgebank address from the registry contract
+// 	sugar := sub.SugaredLogger
+// 	oracleAddress, err := txs.GetAddressFromBridgeRegistry(ethClient, sub.RegistryContractAddress, txs.Oracle, sub.SugaredLogger)
+// 	if err != nil {
+// 		sugar.Error("Error getting oracle address: ", err.Error())
+// 		return nil, err
+// 	}
+// 	oracleContract, err := oracle.NewOracle(oracleAddress, ethClient)
+// 	if err != nil {
+// 		sugar.Error("Error getting oracle contract: ", err.Error())
+// 		return nil, err
+// 	}
+// 	callOpts := bind.CallOpts{
+// 		Pending: false, // Should this be true? Should the relayer on wake up be aware of a pending change?
+// 		Context: context.Background(),
+// 	}
+// 	nonce, err := oracleContract.LastNonceSubmitted(&callOpts)
+// 	if err != nil {
+// 		sugar.Error("Error getting bridgebank LockBurnNonce: ", err.Error())
+// 		return nil, err
+// 	}
+// 	return nonce, nil
+// }
 
 // Start an Ethereum chain subscription
 func (sub EthereumSub) Start(txFactory tx.Factory, completionEvent *sync.WaitGroup) {
