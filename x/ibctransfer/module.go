@@ -2,12 +2,14 @@ package ibc_sifchain
 
 import (
 	"encoding/json"
+
 	whitelisttypes "github.com/Sifchain/sifnode/x/whitelist/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	ibc_transfer_types "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/types"
+	"github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer"
+	sdktransferkeeper "github.com/cosmos/cosmos-sdk/x/ibc/applications/transfer/keeper"
 	"github.com/cosmos/cosmos-sdk/x/ibc/core/04-channel/types"
 	porttypes "github.com/cosmos/cosmos-sdk/x/ibc/core/05-port/types"
 	"github.com/gorilla/mux"
@@ -27,51 +29,53 @@ var (
 	_ porttypes.IBCModule   = AppModule{}
 )
 
-// AppModuleBasic defines the basic application module used by the dispensation module.
-type AppModuleBasic struct{}
-
-func (AppModuleBasic) Name() string {
-	return CosmosAppModuleBasic{}.Name()
+// AppModuleBasic defines the basic application module.
+type AppModuleBasic struct{
+	cosmosAppModule transfer.AppModule
 }
 
-func (AppModuleBasic) RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
-	CosmosAppModuleBasic{}.RegisterLegacyAminoCodec(cdc)
+func (am AppModuleBasic) Name() string {
+	return am.cosmosAppModule.Name()
+}
+
+func (am AppModuleBasic) RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
+	am.cosmosAppModule.RegisterLegacyAminoCodec(cdc)
 }
 
 // RegisterInterfaces registers the module's interface types
-func (b AppModuleBasic) RegisterInterfaces(registry cdctypes.InterfaceRegistry) {
-	CosmosAppModuleBasic{}.RegisterInterfaces(registry)
+func (am AppModuleBasic) RegisterInterfaces(registry cdctypes.InterfaceRegistry) {
+	am.cosmosAppModule.RegisterInterfaces(registry)
 }
 
-// DefaultGenesis returns default genesis state as raw bytes for the dispensation module.
-func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
-	return CosmosAppModuleBasic{}.DefaultGenesis(cdc)
+// DefaultGenesis returns default genesis state as raw bytes for the module.
+func (am AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
+	return am.cosmosAppModule.DefaultGenesis(cdc)
 }
 
-// ValidateGenesis performs genesis state validation for the dispensation module.
-func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, config client.TxEncodingConfig, bz json.RawMessage) error {
-	return CosmosAppModuleBasic{}.ValidateGenesis(cdc, config, bz)
+// ValidateGenesis performs genesis state validation for the module.
+func (am AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, config client.TxEncodingConfig, bz json.RawMessage) error {
+	return am.cosmosAppModule.ValidateGenesis(cdc, config, bz)
 }
 
-// RegisterRESTRoutes registers the REST routes for the dispensation module.
-func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, rtr *mux.Router) {
-	CosmosAppModuleBasic{}.RegisterRESTRoutes(ctx, rtr)
+// RegisterRESTRoutes registers the REST routes for the module.
+func (am AppModuleBasic) RegisterRESTRoutes(ctx client.Context, rtr *mux.Router) {
+	am.cosmosAppModule.RegisterRESTRoutes(ctx, rtr)
 }
 
-func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {
-	CosmosAppModuleBasic{}.RegisterGRPCGatewayRoutes(clientCtx, mux)
+func (am AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {
+	am.cosmosAppModule.RegisterGRPCGatewayRoutes(clientCtx, mux)
 }
 
-// GetTxCmd returns the root tx command for the dispensation module.
-func (AppModuleBasic) GetTxCmd() *cobra.Command {
+// GetTxCmd returns the root tx command for the module.
+func (am AppModuleBasic) GetTxCmd() *cobra.Command {
 	// Append local TX cmd to this if required
-	return CosmosAppModuleBasic{}.GetTxCmd()
+	return am.cosmosAppModule.GetTxCmd()
 }
 
-// GetQueryCmd returns no root query command for the dispensation module.
-func (AppModuleBasic) GetQueryCmd() *cobra.Command {
+// GetQueryCmd returns no root query command for the module.
+func (am AppModuleBasic) GetQueryCmd() *cobra.Command {
 	// Append local TX cmd to this if required
-	return CosmosAppModuleBasic{}.GetQueryCmd()
+	return am.cosmosAppModule.GetQueryCmd()
 }
 
 //____________________________________________________________________________
@@ -79,8 +83,6 @@ func (AppModuleBasic) GetQueryCmd() *cobra.Command {
 // AppModule implements an application module for the dispensation module.
 type AppModule struct {
 	AppModuleBasic
-	cosmosAppModule CosmosAppModule
-	keeper          Keeper
 	whitelistKeeper whitelisttypes.Keeper
 	cdc             codec.BinaryMarshaler
 }
@@ -110,7 +112,7 @@ func (am AppModule) OnChanCloseConfirm(ctx sdk.Context, portID, channelID string
 }
 
 func (am AppModule) OnRecvPacket(ctx sdk.Context, packet types.Packet) (*sdk.Result, []byte, error) {
-	return OnRecvPacketWhiteListed(am.keeper, ctx, packet, am.whitelistKeeper)
+	return OnRecvPacketWhiteListed(ctx, am.cosmosAppModule, packet)
 }
 
 func (am AppModule) OnAcknowledgementPacket(ctx sdk.Context, packet types.Packet, acknowledgement []byte) (*sdk.Result, error) {
@@ -121,19 +123,18 @@ func (am AppModule) OnTimeoutPacket(ctx sdk.Context, packet types.Packet) (*sdk.
 	return am.cosmosAppModule.OnTimeoutPacket(ctx, packet)
 }
 
-func NewAppModule(keeper Keeper, cdc codec.BinaryMarshaler, whitelistKeeper whitelisttypes.Keeper) AppModule {
+func NewAppModule(keeper sdktransferkeeper.Keeper, cdc codec.BinaryMarshaler) AppModule {
 	return AppModule{
-		AppModuleBasic:  AppModuleBasic{},
-		cosmosAppModule: NewCosmosAppModule(keeper),
-		keeper:          keeper,
-		whitelistKeeper: whitelistKeeper,
+		AppModuleBasic:  AppModuleBasic{
+			cosmosAppModule: transfer.NewAppModule(keeper),
+		},
 		cdc:             cdc,
 	}
 }
 
 // IBC does not support a legacy querier
 func (am AppModule) LegacyQuerierHandler(amino *codec.LegacyAmino) sdk.Querier {
-	return nil
+	return am.cosmosAppModule.LegacyQuerierHandler(amino)
 }
 
 func (am AppModule) RegisterServices(cfg module.Configurator) {
@@ -141,12 +142,14 @@ func (am AppModule) RegisterServices(cfg module.Configurator) {
 }
 
 // Name returns the dispensation module's name.
-func (AppModule) Name() string {
-	return ibc_transfer_types.ModuleName
+func (am AppModule) Name() string {
+	return am.cosmosAppModule.Name()
 }
 
 // RegisterInvariants registers the dispensation module invariants.
-func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}
+func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
+	am.cosmosAppModule.RegisterInvariants(ir)
+}
 
 // Route returns the message routing key for the dispensation module.
 func (am AppModule) Route() sdk.Route {
@@ -154,8 +157,8 @@ func (am AppModule) Route() sdk.Route {
 }
 
 // QuerierRoute returns the dispensation module's querier route name.
-func (AppModule) QuerierRoute() string {
-	return ibc_transfer_types.QuerierRoute
+func (am AppModule) QuerierRoute() string {
+	return am.cosmosAppModule.QuerierRoute()
 }
 
 // InitGenesis performs genesis initialization for the dispensation module. It returns
