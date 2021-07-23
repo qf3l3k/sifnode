@@ -30,3 +30,5 @@ type AuthKeeper interface {
 	SetModuleAccount(sdk.Context, authtypes.ModuleAccountI)
 	GetModuleAccount(ctx sdk.Context, moduleName string) authtypes.ModuleAccountI
 }
+
+type WhitelistKeepe
